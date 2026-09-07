@@ -9,13 +9,13 @@ Automatically generated open issue overview for Windows.
 
 link:quality-status.adoc[Back to overview]
 
-*Total Issues:* 146
+*Total Issues:* 151
 
 * OS-specific: 10
 
 * Multi-OS: 0
 
-* Cross-platform: 136
+* Cross-platform: 141
 
 == Windows Specific Issues
 
@@ -24,23 +24,23 @@ link:quality-status.adoc[Back to overview]
 | Issue | Summary
 2+^| *0-10 days*
 
+| link:https://github.com/devonfw/IDEasy/issues/2406[#2406]
+| Prepare IDEasy for Microsoft Store App Submission
+
+| link:https://github.com/devonfw/IDEasy/issues/2405[#2405]
+| Set Up Microsoft Store Developer Account for IDEasy
+
+2+^| *11-30 days*
+
 | link:https://github.com/devonfw/IDEasy/issues/2342[#2342]
 | Display ProgressBar progress in windows taskbar
 
-2+^| *11-30 days*
+2+^| *31-60 days*
 
 | link:https://github.com/devonfw/IDEasy/issues/2226[#2226]
 | Show IDEasy project, workspace and repository in the Git Bash / Windows Termina…
 
-2+^| *61-90 days*
-
-| link:https://github.com/devonfw/IDEasy/issues/1981[#1981]
-| ide update fails on windows@arm64
-
 2+^| *90+ days*
-
-| link:https://github.com/devonfw/IDEasy/issues/1873[#1873]
-| Implement generic get-edition implementation for global tools under windows
 
 | link:https://github.com/devonfw/IDEasy/issues/1746[#1746]
 | ide shell broken
