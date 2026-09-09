@@ -36,8 +36,10 @@ public class Spyder extends PipBasedIdeToolCommandlet {
   public void setEnvironment(EnvironmentContext environmentContext, ToolInstallation toolInstallation, boolean additionalInstallation) {
     super.setEnvironment(environmentContext, toolInstallation, additionalInstallation);
 
-    Path spyderConfig = this.context.getWorkspacePath().resolve(SPYDER_CONFDIR_NAME);
-    environmentContext.withEnvVar(SPYDER_CONFDIR, spyderConfig.toString());
+    Path workspacePath = this.context.getWorkspacePath();
+    if (workspacePath != null) {
+      environmentContext.withEnvVar(SPYDER_CONFDIR, workspacePath.resolve(SPYDER_CONFDIR_NAME).toString());
+    }
   }
 
   @Override
