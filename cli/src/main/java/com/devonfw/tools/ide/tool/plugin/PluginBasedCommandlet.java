@@ -128,6 +128,7 @@ public abstract class PluginBasedCommandlet extends LocalToolCommandlet implemen
 
     ProcessContext pc = this.context.newProcess().errorHandling(ProcessErrorHandling.THROW_CLI);
     ToolInstallRequest request = new ToolInstallRequest(true);
+    request.setProcessContext(pc);
     install(request);
     installPlugin(plugin, step, pc);
   }
