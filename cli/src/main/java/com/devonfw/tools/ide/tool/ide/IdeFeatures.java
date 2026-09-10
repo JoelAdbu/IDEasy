@@ -2,6 +2,9 @@ package com.devonfw.tools.ide.tool.ide;
 
 import java.nio.file.Path;
 
+import com.devonfw.tools.ide.cli.CliException;
+import com.devonfw.tools.ide.context.IdeContext;
+
 /**
  * Interface for IDE-specific features that are independent of the installation mechanism (binary vs. package manager).
  * <p>
@@ -11,22 +14,43 @@ import java.nio.file.Path;
 public interface IdeFeatures {
 
   /**
+   * @return the {@link com.devonfw.tools.ide.context.IdeContext} of the tool owning the IDE features. Needed so that the default methods of this interface can
+   *     access the context.
+   */
+  IdeContext getContext();
+
+  /**
+   * @return the name of the tool owning the IDE features.
+   */
+  String getName();
+
+  /**
    * Configures (initializes or updates) the workspace for this IDE using the templates from the settings.
    */
   void configureWorkspace();
 
   /**
    * @return the {@link Path} to the IDE-specific metadata folder for the current workspace, located at {@code $IDE_HOME/.ide/«toolName»/«workspace»}. Unlike
-   *     {@link com.devonfw.tools.ide.context.IdeContext#getWorkspacePath() the workspace path} (which holds the projects to open), this folder keeps
-   *     IDE-specific metadata (e.g. {@code .vmoptions} or {@code *.properties} files) out of the workspace so it stays clean and independent of the IDE being
-   *     used.
+   *     {@link IdeContext#getWorkspacePath() the workspace path} (which holds the projects to open), this folder keeps IDE-specific metadata (e.g.
+   *     {@code .vmoptions} or {@code *.properties} files) out of the workspace so it stays clean and independent of the IDE being used.
+   *
+   *     <p>
+   *     The default implementation is shared by all IDEs, whether installed as binary (see {@link IdeToolCommandlet}) or via a package manager (see
+   *     {@link com.devonfw.tools.ide.tool.pip.PipBasedIdeToolCommandlet}).
    */
-  Path getIdeMetadataPath();
+  default Path getIdeMetadataPath() {
+
+    IdeContext context = getContext();
+    return context.getIdeHome().resolve(IdeContext.FOLDER_DOT_IDE).resolve(getName()).resolve(context.getWorkspaceName());
+  }
 
   /**
    * Imports the repository specified by the given {@link Path} into the IDE managed by this {@link IdeFeatures}.
    *
    * @param repositoryPath the {@link Path} to the repository directory to import.
    */
-  void importRepository(Path repositoryPath);
+  default void importRepository(Path repositoryPath) {
+
+    throw new CliException("Repository import is not yet supported for IDE " + getName());
+  }
 }

@@ -27,6 +27,11 @@ public abstract class IdeToolCommandlet extends PluginBasedCommandlet implements
 
   private final IdeWorkspaceConfigurer workspaceConfigurer;
 
+  @Override
+  public IdeContext getContext() {
+    return this.context;
+  }
+
   /**
    * The constructor.
    *
@@ -97,18 +102,6 @@ public abstract class IdeToolCommandlet extends PluginBasedCommandlet implements
   }
 
   /**
-   * @return the {@link Path} to the IDE-specific metadata folder for the {@link IdeContext#getWorkspaceName() current workspace}, located at
-   *     {@code $IDE_HOME/.ide/«ide»/«workspace»}. Unlike {@link IdeContext#getWorkspacePath() the workspace path} (which holds the projects to open), this
-   *     folder keeps IDE-specific metadata (e.g. {@code .vmoptions} or {@code *.properties} files) out of the workspace so it stays clean and independent of
-   *     the IDE being used.
-   */
-  @Override
-  public Path getIdeMetadataPath() {
-
-    return this.context.getIdeHome().resolve(IdeContext.FOLDER_DOT_IDE).resolve(getName()).resolve(this.context.getWorkspaceName());
-  }
-
-  /**
    * Configure (initialize or update) the workspace for this IDE using the templates from the settings.
    */
   @Override
@@ -121,8 +114,8 @@ public abstract class IdeToolCommandlet extends PluginBasedCommandlet implements
    * Registers support for synchronizing an extra SDK/template for this IDE.
    *
    * <p>
-   * The registered template path must be relative to the IDE workspace root. During workspace synchronization, the generic extra-SDK handling performed by
-   * the {@link IdeWorkspaceConfigurer} uses this mapping to locate the corresponding template file in the settings repository and merge it into the current
+   * The registered template path must be relative to the IDE workspace root. During workspace synchronization, the generic extra-SDK handling performed by the
+   * {@link IdeWorkspaceConfigurer} uses this mapping to locate the corresponding template file in the settings repository and merge it into the current
    * workspace.
    * </p>
    *
@@ -132,16 +125,5 @@ public abstract class IdeToolCommandlet extends PluginBasedCommandlet implements
   protected void registerExtraSdkTemplate(String sdk, Path relativeTemplatePath) {
 
     this.workspaceConfigurer.registerExtraSdkTemplate(sdk, relativeTemplatePath);
-  }
-
-  /**
-   * Imports the repository specified by the given {@link Path} into the IDE managed by this {@link IdeToolCommandlet}.
-   *
-   * @param repositoryPath the {@link Path} to the repository directory to import.
-   */
-  @Override
-  public void importRepository(Path repositoryPath) {
-
-    throw new UnsupportedOperationException("Repository import is not yet implemented for IDE " + this.tool);
   }
 }

@@ -35,6 +35,11 @@ import com.devonfw.tools.ide.version.VersionIdentifier;
  */
 public abstract class PipBasedIdeToolCommandlet extends PipBasedCommandlet implements IdeFeatures, PluginFeatures {
 
+  @Override
+  public IdeContext getContext() {
+    return this.context;
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(PipBasedIdeToolCommandlet.class);
 
   private final IdeWorkspaceConfigurer workspaceConfigurer;
@@ -72,22 +77,6 @@ public abstract class PipBasedIdeToolCommandlet extends PipBasedCommandlet imple
   @Override
   public void configureWorkspace() {
     this.workspaceConfigurer.configureWorkspace();
-  }
-
-  @Override
-  public Path getIdeMetadataPath() {
-
-    return this.context.getIdeHome().resolve(IdeContext.FOLDER_DOT_IDE).resolve(getName()).resolve(this.context.getWorkspaceName());
-  }
-
-  /**
-   * Imports the repository specified by the given {@link Path} into the IDE managed by this commandlet.
-   *
-   * @param repositoryPath the {@link Path} to the repository directory to import.
-   */
-  @Override
-  public void importRepository(Path repositoryPath) {
-    throw new UnsupportedOperationException("Repository import is not yet implemented for IDE " + this.tool);
   }
 
   /**
