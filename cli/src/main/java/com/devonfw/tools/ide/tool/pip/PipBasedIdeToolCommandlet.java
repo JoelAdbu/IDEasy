@@ -2,7 +2,6 @@ package com.devonfw.tools.ide.tool.pip;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -26,7 +25,6 @@ import com.devonfw.tools.ide.tool.ide.IdeWorkspaceConfigurer;
 import com.devonfw.tools.ide.tool.plugin.PluginFeatures;
 import com.devonfw.tools.ide.tool.plugin.PluginManager;
 import com.devonfw.tools.ide.tool.plugin.ToolPluginDescriptor;
-import com.devonfw.tools.ide.tool.plugin.ToolPlugins;
 import com.devonfw.tools.ide.version.VersionIdentifier;
 
 /**
@@ -74,40 +72,22 @@ public abstract class PipBasedIdeToolCommandlet extends PipBasedCommandlet imple
     return runTool(ProcessMode.BACKGROUND, null, args);
   }
 
+  /**
+   * @return the {@link IdeWorkspaceConfigurer} for this IDE.
+   */
   @Override
-  public void configureWorkspace() {
-    this.workspaceConfigurer.configureWorkspace();
+  public IdeWorkspaceConfigurer getWorkspaceConfigurer() {
+
+    return this.workspaceConfigurer;
   }
 
   /**
    * @return the {@link PluginManager} implementing the plugin logic of this {@link PipBasedIdeToolCommandlet}.
    */
-  protected PluginManager getPluginManager() {
+  @Override
+  public PluginManager getPluginManager() {
 
     return this.pluginManager;
-  }
-
-  @Override
-  public ToolPlugins getPlugins() {
-
-    return this.pluginManager.getPlugins();
-  }
-
-  @Override
-  public ToolPluginDescriptor getPlugin(String key) {
-    return this.pluginManager.getPlugin(key);
-  }
-
-  @Override
-  public boolean isPluginUrlNeeded() {
-
-    return false;
-  }
-
-  @Override
-  public Path getPluginsConfigPath() {
-
-    return this.context.getSettingsPath().resolve(this.tool).resolve(IdeContext.FOLDER_PLUGINS);
   }
 
   /**
@@ -131,12 +111,6 @@ public abstract class PipBasedIdeToolCommandlet extends PipBasedCommandlet imple
       this.pluginManager.resetPlugins();
     }
     installPlugins(getPlugins().getPlugins(), request.getProcessContext());
-  }
-
-  @Override
-  public void installPlugins(Collection<ToolPluginDescriptor> plugins, ProcessContext pc) {
-
-    this.pluginManager.installPlugins(plugins, pc);
   }
 
   @Override
@@ -203,22 +177,5 @@ public abstract class PipBasedIdeToolCommandlet extends PipBasedCommandlet imple
       }
     }
     return runPackageManager(request);
-  }
-
-  @Override
-  public Path retrievePluginMarkerFilePath(ToolPluginDescriptor plugin) {
-
-    return this.pluginManager.retrievePluginMarkerFilePath(plugin);
-  }
-
-  @Override
-  public void createPluginMarkerFile(ToolPluginDescriptor plugin) {
-
-    this.pluginManager.createPluginMarkerFile(plugin);
-  }
-
-  @Override
-  public void handleInstallForInactivePlugin(ToolPluginDescriptor plugin) {
-    LOG.debug("Omitting installation of inactive plugin {} ({}).", plugin.name(), plugin.id());
   }
 }

@@ -27,11 +27,6 @@ public abstract class IdeToolCommandlet extends PluginBasedCommandlet implements
 
   private final IdeWorkspaceConfigurer workspaceConfigurer;
 
-  @Override
-  public IdeContext getContext() {
-    return this.context;
-  }
-
   /**
    * The constructor.
    *
@@ -102,12 +97,12 @@ public abstract class IdeToolCommandlet extends PluginBasedCommandlet implements
   }
 
   /**
-   * Configure (initialize or update) the workspace for this IDE using the templates from the settings.
+   * @return the {@link IdeWorkspaceConfigurer} for this IDE.
    */
   @Override
-  public void configureWorkspace() {
+  public IdeWorkspaceConfigurer getWorkspaceConfigurer() {
 
-    this.workspaceConfigurer.configureWorkspace();
+    return this.workspaceConfigurer;
   }
 
   /**

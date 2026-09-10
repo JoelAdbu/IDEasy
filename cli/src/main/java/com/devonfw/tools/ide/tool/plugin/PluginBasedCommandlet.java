@@ -21,6 +21,11 @@ import com.devonfw.tools.ide.tool.ToolInstallRequest;
  */
 public abstract class PluginBasedCommandlet extends LocalToolCommandlet implements PluginFeatures {
 
+  @Override
+  public IdeContext getContext() {
+    return this.context;
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(PluginBasedCommandlet.class);
 
   private final PluginManager pluginManager;
@@ -51,27 +56,10 @@ public abstract class PluginBasedCommandlet extends LocalToolCommandlet implemen
   /**
    * @return the {@link PluginManager} for this tool.
    */
-  protected PluginManager getPluginManager() {
+  @Override
+  public PluginManager getPluginManager() {
 
     return this.pluginManager;
-  }
-
-  @Override
-  public ToolPlugins getPlugins() {
-
-    return this.pluginManager.getPlugins();
-  }
-
-  @Override
-  public boolean isPluginUrlNeeded() {
-
-    return false;
-  }
-
-  @Override
-  public Path getPluginsConfigPath() {
-
-    return this.context.getSettingsPath().resolve(this.tool).resolve(IdeContext.FOLDER_PLUGINS);
   }
 
   @Override
@@ -83,12 +71,6 @@ public abstract class PluginBasedCommandlet extends LocalToolCommandlet implemen
     }
     this.context.getFileAccess().mkdirs(getPluginsInstallationPath());
     installPlugins(getPlugins().getPlugins(), request.getProcessContext());
-  }
-
-  @Override
-  public void installPlugins(Collection<ToolPluginDescriptor> plugins, ProcessContext pc) {
-
-    this.pluginManager.installPlugins(plugins, pc);
   }
 
   /**
@@ -103,18 +85,6 @@ public abstract class PluginBasedCommandlet extends LocalToolCommandlet implemen
   protected Set<String> getExtraPlugins(Collection<ToolPluginDescriptor> plugins) {
 
     return this.pluginManager.getExtraPlugins(plugins);
-  }
-
-  @Override
-  public Path retrievePluginMarkerFilePath(ToolPluginDescriptor plugin) {
-
-    return this.pluginManager.retrievePluginMarkerFilePath(plugin);
-  }
-
-  @Override
-  public void createPluginMarkerFile(ToolPluginDescriptor plugin) {
-
-    this.pluginManager.createPluginMarkerFile(plugin);
   }
 
   @Override
@@ -143,17 +113,5 @@ public abstract class PluginBasedCommandlet extends LocalToolCommandlet implemen
   public void deleteAllPlugins() {
 
     this.context.getFileAccess().delete(getPluginsInstallationPath());
-  }
-
-  @Override
-  public ToolPluginDescriptor getPlugin(String key) {
-
-    return this.pluginManager.getPlugin(key);
-  }
-
-  @Override
-  public void handleInstallForInactivePlugin(ToolPluginDescriptor plugin) {
-
-    LOG.debug("Omitting installation of inactive plugin {} ({}).", plugin.name(), plugin.id());
   }
 }

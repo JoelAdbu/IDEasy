@@ -25,9 +25,19 @@ public interface IdeFeatures {
   String getName();
 
   /**
-   * Configures (initializes or updates) the workspace for this IDE using the templates from the settings.
+   * @return the {@link IdeWorkspaceConfigurer} that configures the workspace of this IDE. Needed so that the default {@link #configureWorkspace()} of this interface
+   *     can delegate the shared workspace configuration logic to a single implementation.
    */
-  void configureWorkspace();
+  IdeWorkspaceConfigurer getWorkspaceConfigurer();
+
+  /**
+   * Configures (initializes or updates) the workspace for this IDE using the templates from the settings. The default implementation is shared by all IDEs, whether
+   *     installed as binary (see {@link IdeToolCommandlet}) or via a package manager (see {@link com.devonfw.tools.ide.tool.pip.PipBasedIdeToolCommandlet}).
+   */
+  default void configureWorkspace() {
+
+    getWorkspaceConfigurer().configureWorkspace();
+  }
 
   /**
    * @return the {@link Path} to the IDE-specific metadata folder for the current workspace, located at {@code $IDE_HOME/.ide/«toolName»/«workspace»}. Unlike

@@ -3,6 +3,7 @@ package com.devonfw.tools.ide.tool.plugin;
 import java.nio.file.Path;
 import java.util.Collection;
 
+import com.devonfw.tools.ide.context.IdeContext;
 import com.devonfw.tools.ide.process.ProcessContext;
 import com.devonfw.tools.ide.step.Step;
 import com.devonfw.tools.ide.tool.ToolCommandlet;
@@ -15,6 +16,17 @@ import com.devonfw.tools.ide.tool.ToolCommandlet;
  * </p>
  */
 public interface PluginFeatures {
+
+  /**
+   * @return the {@link IdeContext} of the tool owning the plugins. Needed so that the default methods of this interface can access the context.
+   */
+  IdeContext getContext();
+
+  /**
+   * @return the {@link PluginManager} implementing the plugin logic of the tool. Needed so that the default methods of this interface can delegate the shared
+   *     plugin behaviour to a single implementation.
+   */
+  PluginManager getPluginManager();
 
   /**
    * @return the {@link ToolCommandlet#getName() name} of the tool owning the plugins.
@@ -32,9 +44,13 @@ public interface PluginFeatures {
   String getInstalledEdition();
 
   /**
-   * @return the {@link Path} to the folder with the plugin configuration files inside the settings.
+   * @return the {@link Path} to the folder with the plugin configuration files inside the settings. The default implementation is shared by all plugin-capable
+   *     tools (see {@link com.devonfw.tools.ide.tool.plugin.PluginBasedCommandlet} and {@link com.devonfw.tools.ide.tool.pip.PipBasedIdeToolCommandlet}).
    */
-  Path getPluginsConfigPath();
+  default Path getPluginsConfigPath() {
+
+    return getContext().getSettingsPath().resolve(getName()).resolve(IdeContext.FOLDER_PLUGINS);
+  }
 
   /**
    * @return the {@link Path} where the plugins of this tool shall be installed.
@@ -42,28 +58,41 @@ public interface PluginFeatures {
   Path getPluginsInstallationPath();
 
   /**
-   * @return {@code true} if the {@link ToolPluginDescriptor#url() plugin url} is needed, {@code false} otherwise.
+   * @return {@code true} if the {@link ToolPluginDescriptor#url() plugin url} is needed, {@code false} otherwise. The default (no URL) is shared by all
+   *     plugin-capable tools; IDEs that need a URL (e.g. Eclipse) override this.
    */
-  boolean isPluginUrlNeeded();
+  default boolean isPluginUrlNeeded() {
+
+    return false;
+  }
 
   /**
-   * @return the {@link ToolPlugins} configured for this tool.
+   * @return the {@link ToolPlugins} configured for this tool. The default implementation is shared by all plugin-capable tools.
    */
-  ToolPlugins getPlugins();
+  default ToolPlugins getPlugins() {
+
+    return getPluginManager().getPlugins();
+  }
 
   /**
    * @param key the filename of the properties file configuring the requested plugin (typically excluding the ".properties" extension).
-   * @return the {@link ToolPluginDescriptor} for the given {@code key}.
+   * @return the {@link ToolPluginDescriptor} for the given {@code key}. The default implementation is shared by all plugin-capable tools.
    */
-  ToolPluginDescriptor getPlugin(String key);
+  default ToolPluginDescriptor getPlugin(String key) {
+
+    return getPluginManager().getPlugin(key);
+  }
 
   /**
-   * Installs the given active plugins and handles the inactive ones.
+   * Installs the given active plugins and handles the inactive ones. The default implementation is shared by all plugin-capable tools.
    *
    * @param plugins the {@link Collection} of {@link ToolPluginDescriptor plugins} to install.
    * @param pc the {@link ProcessContext} to use.
    */
-  void installPlugins(Collection<ToolPluginDescriptor> plugins, ProcessContext pc);
+  default void installPlugins(Collection<ToolPluginDescriptor> plugins, ProcessContext pc) {
+
+    getPluginManager().installPlugins(plugins, pc);
+  }
 
   /**
    * Performs the tool-specific installation of a single plugin.
@@ -94,20 +123,23 @@ public interface PluginFeatures {
   void deleteAllPlugins();
 
   /**
-   * @param plugin the in {@link ToolPluginDescriptor#active() active} {@link ToolPluginDescriptor} that is skipped for regular plugin installation.
-   */
-  void handleInstallForInactivePlugin(ToolPluginDescriptor plugin);
-
-  /**
    * @param plugin the {@link ToolPluginDescriptor plugin} to search for.
-   * @return the {@link Path} to the plugin marker file or {@code null} if we are not inside an IDEasy project.
+   * @return the {@link Path} to the plugin marker file or {@code null} if we are not inside an IDEasy project. The default implementation is shared by all
+   *     plugin-capable tools.
    */
-  Path retrievePluginMarkerFilePath(ToolPluginDescriptor plugin);
+  default Path retrievePluginMarkerFilePath(ToolPluginDescriptor plugin) {
+
+    return getPluginManager().retrievePluginMarkerFilePath(plugin);
+  }
 
   /**
-   * Creates a marker file for a plugin in {@code $IDE_HOME/.ide/plugin.<<tool>>.<<edition>>.<<plugin-name>>}.
+   * Creates a marker file for a plugin in {@code $IDE_HOME/.ide/plugin.<<tool>>.<<edition>>.<<plugin-name>>}. The default implementation is shared by all
+   * plugin-capable tools.
    *
    * @param plugin the plugin the {@link ToolPluginDescriptor plugin} for which the marker file should be created.
    */
-  void createPluginMarkerFile(ToolPluginDescriptor plugin);
+  default void createPluginMarkerFile(ToolPluginDescriptor plugin) {
+
+    getPluginManager().createPluginMarkerFile(plugin);
+  }
 }

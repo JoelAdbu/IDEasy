@@ -154,7 +154,7 @@ public class PluginManager {
       } else {
         Path pluginMarkerFile = retrievePluginMarkerFilePath(plugin);
         if ((pluginMarkerFile == null) || !Files.exists(pluginMarkerFile)) {
-          this.tool.handleInstallForInactivePlugin(plugin);
+          handleInstallForInactivePlugin(plugin);
         }
       }
     }
@@ -180,11 +180,11 @@ public class PluginManager {
   /**
    * @param plugins the configured {@link ToolPluginDescriptor plugins} used to detect undefined entries.
    * @return the {@link Set} of {@link ToolPluginDescriptor#name() plugin names} configured in the tool-specific {@code «TOOL»_EXTRA_PLUGINS} variable (e.g.
-   *     {@code VSCODE_EXTRA_PLUGINS=copilot,docker}). This allows a user to permanently opt-in to plugins that are not {@link ToolPluginDescriptor#active()
-   *     active} in the project settings, without modifying the shared settings and without losing them when plugins are purged and reinstalled on IDE upgrade.
-   *     Values refer to the {@link ToolPluginDescriptor#name() name} of the plugin (the filename of its {@code .properties} file) and not to the
-   *     {@link ToolPluginDescriptor#id() id}. Names that do not resolve to a configured plugin are logged as a warning and skipped so that a single stale entry
-   *     cannot break the entire installation.
+   *     {@code VSCODE_EXTRA_PLUGINS=copilot,docker}). This allows a user to permanently opt-in to plugins that are not
+   *     {@link ToolPluginDescriptor#active() active} in the project settings, without modifying the shared settings and without losing them when plugins are
+   *     purged and reinstalled on IDE upgrade. Values refer to the {@link ToolPluginDescriptor#name() name} of the plugin (the filename of its
+   *     {@code .properties} file) and not to the {@link ToolPluginDescriptor#id() id}. Names that do not resolve to a configured plugin are logged as a warning
+   *     and skipped so that a single stale entry cannot break the entire installation.
    */
   public Set<String> getExtraPlugins(Collection<ToolPluginDescriptor> plugins) {
 
@@ -300,4 +300,9 @@ public class PluginManager {
       LOG.info("Successfully uninstalled plugin {}", plugin);
     }
   }
+
+  private void handleInstallForInactivePlugin(ToolPluginDescriptor plugin) {
+    LOG.debug("Omitting installation of inactive plugin {} ({}).", plugin.name(), plugin.id());
+  }
+
 }
