@@ -121,7 +121,7 @@ public class IniMerger extends FileMerger {
       IniSection mergedSection = mergedIni.getOrCreateSection(sectionName);
       for (String key : wsSection.getPropertyKeys()) {
         String wsValue = wsSection.getPropertyValue(key);
-        String updateValue = mergedSection.getPropertyValue(key);
+        String updateValue = getPropertyValue(mergedSection, key);
         if ((updateValue != null) || addNewProperties) {
           String updateValueResolved = updateValue != null
               ? variables.resolve(updateValue, src, this.legacySupport)
@@ -139,7 +139,7 @@ public class IniMerger extends FileMerger {
     IniSection mergedInitial = mergedIni.getOrCreateSection("");
     for (String key : wsInitial.getPropertyKeys()) {
       String wsValue = wsInitial.getPropertyValue(key);
-      String updateValue = mergedInitial.getPropertyValue(key);
+      String updateValue = getPropertyValue(mergedInitial, key);
       if ((updateValue != null) || addNewProperties) {
         String updateValueResolved = updateValue != null
             ? variables.resolve(updateValue, src, this.legacySupport)
@@ -164,6 +164,18 @@ public class IniMerger extends FileMerger {
   protected boolean doUpgrade(Path workspaceFile) throws Exception {
 
     return doUpgradeTextContent(workspaceFile);
+  }
+
+  /**
+   * Returns the value of the given property key in the given {@link IniSection} or {@code null} if the section does not contain the key.
+   *
+   * @param section the {@link IniSection} to look up in.
+   * @param key the property key.
+   * @return the value or {@code null} if the key is not present.
+   */
+  private static String getPropertyValue(IniSection section, String key) {
+
+    return (section != null) && section.getPropertyKeys().contains(key) ? section.getPropertyValue(key) : null;
   }
 
   /**
