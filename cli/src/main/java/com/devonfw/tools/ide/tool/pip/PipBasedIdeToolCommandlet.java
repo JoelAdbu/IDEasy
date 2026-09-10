@@ -136,6 +136,8 @@ public abstract class PipBasedIdeToolCommandlet extends PipBasedCommandlet imple
   protected void postInstall(ToolInstallRequest request) {
 
     super.postInstall(request);
+
+    configureWorkspace();
     if (!request.isAlreadyInstalled() || this.forcePluginReinstall.isTrue()) {
       this.pluginManager.resetPlugins();
     }
