@@ -166,7 +166,7 @@ public abstract class GlobalToolCommandlet extends AbstractToolCommandlet {
       return toolAlreadyInstalled(request);
     }
     String edition = toolEdition.edition();
-    ToolRepository toolRepository = this.context.getDefaultToolRepository();
+    ToolRepository toolRepository = getToolRepository();
     resolvedVersion = cveCheck(request);
     // download and install the global tool
     FileAccess fileAccess = this.context.getFileAccess();
@@ -187,8 +187,8 @@ public abstract class GlobalToolCommandlet extends AbstractToolCommandlet {
         fileAccess.extract(target, downloadBinaryPath);
         executable = fileAccess.findFirst(downloadBinaryPath, Files::isExecutable, false);
       }
-      pc = this.context.newProcess().errorHandling(ProcessErrorHandling.LOG_WARNING).executable(executable).addArgs(getInstallerArguments());
-      int exitCode = pc.run(ProcessMode.BACKGROUND_SILENT).getExitCode();
+      pc = this.context.newProcess().errorHandling(ProcessErrorHandling.LOG_WARNING).executable(executable);
+      int exitCode = runInstaller(pc);
       if (tmpDir != null) {
         fileAccess.delete(tmpDir);
       }
@@ -543,10 +543,14 @@ public abstract class GlobalToolCommandlet extends AbstractToolCommandlet {
   }
 
   /**
-   * @return the additional arguments passed to the downloaded installer executable (e.g. silent mode flags). The default is an empty {@link List}. Override
-   *     this for tools whose installer requires specific arguments to run unattended.
+   * Runs the downloaded installer. By default it is started in the background without any arguments. Override this for tools whose installer needs specific
+   * arguments or has to be run differently.
+   *
+   * @param pc the {@link ProcessContext} with the installer as executable.
+   * @return the exit code of the installer.
    */
-  protected List<String> getInstallerArguments() {
-    return List.of();
+  protected int runInstaller(ProcessContext pc) {
+
+    return pc.run(ProcessMode.BACKGROUND_SILENT).getExitCode();
   }
 }

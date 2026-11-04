@@ -233,9 +233,9 @@ class GitOperationTest extends AbstractIdeContextTest {
     // act
     context.updateUrlsRepository();
 
-    // assert
-    assertThat(context).logAtDebug()
-        .hasMessage("Git is not available. Using existing URL metadata without updating it.");
+    // assert - the missing git is reported as a WARNING (not debug) pointing to `ide install git`, independent of the urlsPath condition
+    assertThat(context).logAtWarning()
+        .hasMessageContaining("ide install git");
 
     Mockito.verify(mock).findGit();
     Mockito.verify(mock, Mockito.never()).findGitRequired();
@@ -244,10 +244,10 @@ class GitOperationTest extends AbstractIdeContextTest {
   }
 
   /**
-   * Verifies that Git is required when Git is not available and no local URL repository exists.
+   * Verifies that a missing Git is only reported as a WARNING pointing to {@code ide install git} and does not abort, even if no local URL repository exists.
    */
   @Test
-  void testUpdateUrlsRepositoryRequiresGitWithoutExistingUrls() {
+  void testUpdateUrlsRepositoryLogsWarningWhenGitMissingAndNoUrls() {
 
     // arrange
     IdeTestContext context = newContext(PROJECT_BASIC, null, true);
@@ -263,8 +263,11 @@ class GitOperationTest extends AbstractIdeContextTest {
     context.updateUrlsRepository();
 
     // assert
+    assertThat(context).logAtWarning()
+        .hasMessageContaining("ide install git");
+
     Mockito.verify(mock).findGit();
-    Mockito.verify(mock).findGitRequired();
+    Mockito.verify(mock, Mockito.never()).findGitRequired();
     Mockito.verify(mock, Mockito.never())
         .pullOrCloneAndResetIfNeeded(Mockito.any(), Mockito.any(), Mockito.any());
   }
