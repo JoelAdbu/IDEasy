@@ -1,5 +1,12 @@
 package com.devonfw.tools.ide.tool.git;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.verify;
+
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -8,12 +15,17 @@ import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.devonfw.tools.ide.cli.CliException;
+import com.devonfw.tools.ide.cli.CliOfflineException;
 import com.devonfw.tools.ide.context.AbstractIdeContextTest;
 import com.devonfw.tools.ide.context.IdeTestContext;
 import com.devonfw.tools.ide.git.GitContext;
 import com.devonfw.tools.ide.git.GitContextImpl;
 import com.devonfw.tools.ide.io.FileAccess;
 import com.devonfw.tools.ide.log.IdeLogLevel;
+import com.devonfw.tools.ide.os.OperatingSystem;
+import com.devonfw.tools.ide.os.SystemArchitecture;
+import com.devonfw.tools.ide.os.SystemInfo;
 import com.devonfw.tools.ide.os.SystemInfoMock;
 import com.devonfw.tools.ide.os.WindowsAppInstallation;
 import com.devonfw.tools.ide.os.WindowsHelperMock;
@@ -27,16 +39,30 @@ import com.devonfw.tools.ide.tool.NativePackageManager;
 import com.devonfw.tools.ide.tool.ToolEditionAndVersion;
 import com.devonfw.tools.ide.tool.ToolInstallRequest;
 import com.devonfw.tools.ide.tool.ToolInstallation;
+import com.devonfw.tools.ide.tool.custom.CustomToolMetadata;
 import com.devonfw.tools.ide.tool.repository.ToolRepository;
 import com.devonfw.tools.ide.url.model.file.json.ToolSecurity;
 import com.devonfw.tools.ide.version.VersionIdentifier;
+import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
+import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 
 /**
  * Test of {@link Git}.
  */
+@WireMockTest
 class GitTest extends AbstractIdeContextTest {
 
   private static final String TOOL_VERSION = "2.45.0";
+
+  private static final String RELEASES = "https://github.com/git-for-windows/git/releases/download/";
+
+  private static final String URL_FILE_X64 = "/latest-64-bit-installer.url";
+
+  private static final String URL_FILE_ARM64 = "/latest-arm64-installer.url";
+
+  private static final String INSTALLER_X64 = RELEASES + "v2.56.0.windows.4/Git-2.56.0.4-64-bit.exe";
+
+  private static final String INSTALLER_ARM64 = RELEASES + "v2.56.0.windows.4/Git-2.56.0.4-arm64.exe";
 
   /** The version query command the package manager based version detection issues on macOS (see {@link NativePackageManager#BREW}). */
   private static final String BREW_VERSION_QUERY = "brew list --versions git";
@@ -81,7 +107,7 @@ class GitTest extends AbstractIdeContextTest {
   }
 
   /**
-   * Returns a fresh, mutable {@link IdeTestContext} (Windows x64, no git, no local URL metadata) suitable for testing the fallback for missing URL metadata.
+   * Returns a fresh, mutable {@link IdeTestContext} (Windows x64, no git, no local URL metadata) suitable for testing the latest installer.
    *
    * @return the {@link IdeTestContext}.
    */
@@ -327,42 +353,21 @@ class GitTest extends AbstractIdeContextTest {
   }
 
   /**
-   * Verifies that on macOS and Linux Git is installed via the package manager, so no installer arguments are produced.
-   */
-  @Test
-  void testGetInstallerArgumentsEmptyOnMacAndLinux() {
-
-    // arrange
-    IdeTestContext macContext = newContext(PROJECT_BASIC);
-    macContext.setSystemInfo(SystemInfoMock.MAC_X64);
-
-    IdeTestContext linuxContext = newContext(PROJECT_BASIC);
-    linuxContext.setSystemInfo(SystemInfoMock.LINUX_X64);
-
-    //act
-    List<String> macInstallerArguments = new Git(macContext).getInstallerArguments();
-    List<String> linuxInstallerArguments = new Git(linuxContext).getInstallerArguments();
-
-    //assert
-    assertThat(macInstallerArguments).isEmpty();
-    assertThat(linuxInstallerArguments).isEmpty();
-  }
-
-  /**
-   * Verifies that on a fresh Windows machine where neither Git nor the URL metadata are available, the {@link GitForWindowsRepository} is used as fallback.
+   * Verifies that on a fresh Windows machine where neither Git nor the URL metadata are available, the latest installer is used.
    */
   @Test
   void testGetToolRepositoryOnFreshWindowsMachine() {
 
     // arrange
     IdeTestContext context = freshWindowsContext();
+    ToolRepository latestInstallerRepository = Mockito.mock(ToolRepository.class);
 
     // act + assert
-    assertThat(new Git(context).getToolRepository()).isInstanceOf(GitForWindowsRepository.class);
+    assertThat(gitWithLatestInstallerRepository(context, latestInstallerRepository).getToolRepository()).isSameAs(latestInstallerRepository);
   }
 
   /**
-   * Verifies that the fallback is also used if the URL metadata folder exists but does not contain Git, as otherwise Git could not be resolved.
+   * Verifies that the latest installer is also used if the URL metadata folder exists but does not contain Git, as otherwise Git could not be resolved.
    */
   @Test
   void testGetToolRepositoryWithoutUrlMetadataForGit() {
@@ -371,9 +376,60 @@ class GitTest extends AbstractIdeContextTest {
     IdeTestContext context = newContext(PROJECT_BASIC, null, true);
     context.setSystemInfo(SystemInfoMock.WINDOWS_X64);
     assertThat(context.getUrlsPath()).isDirectory();
+    ToolRepository latestInstallerRepository = Mockito.mock(ToolRepository.class);
 
     // act + assert
-    assertThat(new Git(context).getToolRepository()).isInstanceOf(GitForWindowsRepository.class);
+    assertThat(gitWithLatestInstallerRepository(context, latestInstallerRepository).getToolRepository()).isSameAs(latestInstallerRepository);
+  }
+
+  /**
+   * Verifies that the regular {@link ToolRepository} is used if Git is installed, since the URL metadata can be cloned then and provides checksums.
+   */
+  @Test
+  void testGetToolRepositoryWithGitButWithoutUrlMetadata() {
+
+    // arrange
+    IdeTestContext context = freshWindowsContext();
+    GitContext gitContext = Mockito.mock(GitContext.class);
+    Mockito.when(gitContext.findGit()).thenReturn(Path.of("C:/Program Files/Git/bin/git.exe"));
+    context.setGitContext(gitContext);
+
+    // act + assert
+    assertThat(new Git(context).getToolRepository()).isSameAs(context.getDefaultToolRepository());
+  }
+
+  /**
+   * Verifies that the regular {@link ToolRepository} is used without looking for Git when the URL metadata for Git already exists.
+   */
+  @Test
+  void testGetToolRepositoryWhenUrlMetadataExists() {
+
+    // arrange
+    IdeTestContext context = freshWindowsContext();
+    context.getFileAccess().mkdirs(context.getUrlsPath().resolve("git"));
+    GitContext gitContext = Mockito.mock(GitContext.class);
+    context.setGitContext(gitContext);
+
+    // act + assert
+    assertThat(new Git(context).getToolRepository()).isSameAs(context.getDefaultToolRepository());
+    Mockito.verifyNoInteractions(gitContext);
+  }
+
+  /**
+   * Verifies that the latest installer is not used on Linux and macOS where Git is installed via the native package manager.
+   */
+  @Test
+  void testGetToolRepositoryOnNonWindows() {
+
+    // arrange
+    IdeTestContext macContext = freshWindowsContext();
+    macContext.setSystemInfo(SystemInfoMock.MAC_X64);
+    IdeTestContext linuxContext = freshWindowsContext();
+    linuxContext.setSystemInfo(SystemInfoMock.LINUX_X64);
+
+    // act + assert
+    assertThat(new Git(macContext).getToolRepository()).isSameAs(macContext.getDefaultToolRepository());
+    assertThat(new Git(linuxContext).getToolRepository()).isSameAs(linuxContext.getDefaultToolRepository());
   }
 
   /**
@@ -395,58 +451,28 @@ class GitTest extends AbstractIdeContextTest {
   }
 
   /**
-   * Verifies that the decision for the fallback only depends on the URL metadata, so looking for Git (and bash) is avoided on a fresh machine.
+   * Verifies that a missing bash is only logged on debug level, as every caller of {@code findBash()} reports it in its own context if it is relevant.
    */
   @Test
-  void testGetToolRepositoryDoesNotLookForGit() {
+  void testFindBashDoesNotSpamLogOnFreshWindowsMachine() {
 
     // arrange
-    IdeTestContext context = freshWindowsContext();
-    GitContext gitContext = Mockito.mock(GitContext.class);
-    context.setGitContext(gitContext);
+    IdeTestContext context = windowsContextWithoutGitInPath();
 
-    // act + assert
-    assertThat(new Git(context).getToolRepository()).isInstanceOf(GitForWindowsRepository.class);
-    Mockito.verifyNoInteractions(gitContext);
+    // act
+    Path bash = context.findBash();
+
+    // assert
+    assertThat(bash).isNull();
+    assertThat(context).logAtDebug().hasMessageContaining("No bash executable could be found on your system.");
+    assertThat(context).logAtInfo().hasNoMessageContaining("bash");
+    assertThat(context).logAtWarning().hasNoMessageContaining("bash");
+    assertThat(context).logAtError().hasNoMessageContaining("bash");
   }
 
   /**
-   * Verifies that the regular {@link ToolRepository} is used without looking for Git when the URL metadata for Git already exists.
-   */
-  @Test
-  void testGetToolRepositoryWhenUrlMetadataExists() {
-
-    // arrange
-    IdeTestContext context = freshWindowsContext();
-    context.getFileAccess().mkdirs(context.getUrlsPath().resolve("git"));
-    GitContext gitContext = Mockito.mock(GitContext.class);
-    context.setGitContext(gitContext);
-
-    // act + assert
-    assertThat(new Git(context).getToolRepository()).isSameAs(context.getDefaultToolRepository());
-    Mockito.verifyNoInteractions(gitContext);
-  }
-
-  /**
-   * Verifies that the fallback is not used on Linux and macOS where Git is installed via the native package manager.
-   */
-  @Test
-  void testGetToolRepositoryOnNonWindows() {
-
-    // arrange
-    IdeTestContext macContext = freshWindowsContext();
-    macContext.setSystemInfo(SystemInfoMock.MAC_X64);
-    IdeTestContext linuxContext = freshWindowsContext();
-    linuxContext.setSystemInfo(SystemInfoMock.LINUX_X64);
-
-    // act + assert
-    assertThat(new Git(macContext).getToolRepository()).isSameAs(macContext.getDefaultToolRepository());
-    assertThat(new Git(linuxContext).getToolRepository()).isSameAs(linuxContext.getDefaultToolRepository());
-  }
-
-  /**
-   * Verifies the entire installation on a fresh Windows machine: the installer of the latest version comes from the fallback repository, it is started
-   * interactively without bash (not in the background) and the regular repository (that would require the URL metadata and hence Git) is never accessed.
+   * Verifies the entire installation on a fresh Windows machine: the installer of the latest version is started with the installation wizard and awaited
+   * without bash, the regular repository (that would require the URL metadata and hence Git) is never accessed and no background installation is reported.
    */
   @Test
   void testInstallOnFreshWindowsMachine() {
@@ -457,20 +483,14 @@ class GitTest extends AbstractIdeContextTest {
     context.setDefaultToolRepository(defaultRepository);
     VersionIdentifier latestVersion = VersionIdentifier.of("2.56.0.4");
     Path installer = context.getUserHome().resolve("git-installer.exe");
-    ToolRepository fallbackRepository = Mockito.mock(ToolRepository.class);
-    Mockito.when(fallbackRepository.resolveVersion(Mockito.eq("git"), Mockito.eq("git"), Mockito.any(), Mockito.any())).thenReturn(latestVersion);
-    Mockito.when(fallbackRepository.findSecurity("git", "git")).thenReturn(ToolSecurity.getEmpty());
-    Mockito.when(fallbackRepository.download(Mockito.eq("git"), Mockito.eq("git"), Mockito.eq(latestVersion), Mockito.any())).thenReturn(installer);
+    ToolRepository latestInstallerRepository = Mockito.mock(ToolRepository.class);
+    Mockito.when(latestInstallerRepository.resolveVersion(Mockito.eq("git"), Mockito.eq("git"), Mockito.any(), Mockito.any())).thenReturn(latestVersion);
+    Mockito.when(latestInstallerRepository.download(Mockito.eq("git"), Mockito.eq("git"), Mockito.eq(latestVersion), Mockito.any())).thenReturn(installer);
     ProcessContext processContext = Mockito.mock(ProcessContext.class, Mockito.RETURNS_SELF);
     Mockito.when(processContext.run(ProcessMode.DEFAULT))
         .thenReturn(new ProcessResultImpl("installer", "installer", ProcessResult.SUCCESS, true, List.of()));
     context.setProcessContext(processContext);
-    Git git = new Git(context) {
-      @Override
-      protected ToolRepository createGitForWindowsRepository() {
-        return fallbackRepository;
-      }
-    };
+    Git git = gitWithLatestInstallerRepository(context, latestInstallerRepository);
     ToolInstallRequest request = ToolInstallRequest.ofDirect();
     request.setRequested(new ToolEditionAndVersion(VersionIdentifier.LATEST));
 
@@ -479,8 +499,181 @@ class GitTest extends AbstractIdeContextTest {
 
     // assert
     assertThat(installation.resolvedVersion()).isEqualTo(latestVersion);
+    assertThat(installation.installedAsynchronously()).isFalse();
     Mockito.verify(processContext).executable(installer);
     Mockito.verify(processContext).addArgs(List.of("/NORESTART", "/NOCANCEL", "/SP-"));
     Mockito.verifyNoInteractions(defaultRepository);
+    assertThat(context).logAtSuccess().hasMessageContaining("Successfully installed git in version 2.56.0.4");
+    assertThat(context).logAtWarning().hasNoMessageContaining("background");
+  }
+
+  /**
+   * Verifies that the latest version and installer are determined from the file for the x64 architecture including the trailing newline of that file.
+   *
+   * @param wmRuntimeInfo wireMock server on a random port.
+   */
+  @Test
+  void testFetchLatestInstallerOnWindowsX64(WireMockRuntimeInfo wmRuntimeInfo) {
+
+    // arrange
+    stubUrlFile(URL_FILE_X64, INSTALLER_X64 + "\n");
+    Git git = gitWithLatestInstallerBaseUrl(contextWithNetwork(wmRuntimeInfo, SystemInfoMock.WINDOWS_X64), wmRuntimeInfo);
+
+    // act
+    CustomToolMetadata installer = git.fetchLatestInstaller();
+
+    // assert
+    assertThat(installer.getVersion()).isEqualTo(VersionIdentifier.of("2.56.0.4"));
+    assertThat(installer.getUrls()).containsExactly(INSTALLER_X64);
+    assertThat(installer.getTool()).isEqualTo("git");
+    assertThat(installer.getEdition()).isEqualTo("git");
+    assertThat(installer.getOs()).isEqualTo(OperatingSystem.WINDOWS);
+    assertThat(installer.getArch()).isEqualTo(SystemArchitecture.X64);
+    assertThat(installer.getChecksums()).isNull();
+  }
+
+  /**
+   * Verifies that on ARM64 the ARM64 installer is used instead of the x64 installer.
+   *
+   * @param wmRuntimeInfo wireMock server on a random port.
+   */
+  @Test
+  void testFetchLatestInstallerOnWindowsArm64(WireMockRuntimeInfo wmRuntimeInfo) {
+
+    // arrange
+    stubUrlFile(URL_FILE_ARM64, INSTALLER_ARM64);
+    Git git = gitWithLatestInstallerBaseUrl(contextWithNetwork(wmRuntimeInfo, SystemInfoMock.WINDOWS_ARM64), wmRuntimeInfo);
+
+    // act
+    CustomToolMetadata installer = git.fetchLatestInstaller();
+
+    // assert
+    assertThat(installer.getUrls()).containsExactly(INSTALLER_ARM64);
+    assertThat(installer.getArch()).isEqualTo(SystemArchitecture.ARM64);
+  }
+
+  /**
+   * Verifies the version of the first Git for Windows release of a Git version, whose installer has no additional version segment.
+   *
+   * @param wmRuntimeInfo wireMock server on a random port.
+   */
+  @Test
+  void testFetchLatestInstallerOfFirstRelease(WireMockRuntimeInfo wmRuntimeInfo) {
+
+    // arrange
+    stubUrlFile(URL_FILE_X64, RELEASES + "v2.57.0.windows.1/Git-2.57.0-64-bit.exe");
+    Git git = gitWithLatestInstallerBaseUrl(contextWithNetwork(wmRuntimeInfo, SystemInfoMock.WINDOWS_X64), wmRuntimeInfo);
+
+    // act + assert
+    assertThat(git.fetchLatestInstaller().getVersion()).isEqualTo(VersionIdentifier.of("2.57.0"));
+  }
+
+  /**
+   * Verifies that an executable is never downloaded from an unexpected location.
+   *
+   * @param wmRuntimeInfo wireMock server on a random port.
+   */
+  @Test
+  void testFetchLatestInstallerRejectsUnexpectedUrl(WireMockRuntimeInfo wmRuntimeInfo) {
+
+    // arrange
+    stubUrlFile(URL_FILE_X64, "https://example.com/Git-2.56.0.4-64-bit.exe");
+    Git git = gitWithLatestInstallerBaseUrl(contextWithNetwork(wmRuntimeInfo, SystemInfoMock.WINDOWS_X64), wmRuntimeInfo);
+
+    // act + assert
+    assertThatThrownBy(git::fetchLatestInstaller).isInstanceOf(CliException.class).hasMessageContaining("unexpected Git installer URL");
+  }
+
+  /**
+   * Verifies that the installer of the wrong architecture is rejected.
+   *
+   * @param wmRuntimeInfo wireMock server on a random port.
+   */
+  @Test
+  void testFetchLatestInstallerRejectsOtherArchitecture(WireMockRuntimeInfo wmRuntimeInfo) {
+
+    // arrange
+    stubUrlFile(URL_FILE_ARM64, INSTALLER_X64);
+    Git git = gitWithLatestInstallerBaseUrl(contextWithNetwork(wmRuntimeInfo, SystemInfoMock.WINDOWS_ARM64), wmRuntimeInfo);
+
+    // act + assert
+    assertThatThrownBy(git::fetchLatestInstaller).isInstanceOf(CliException.class).hasMessageContaining("unexpected Git installer URL");
+  }
+
+  /**
+   * Verifies that a proper error is reported when offline.
+   *
+   * @param wmRuntimeInfo wireMock server on a random port.
+   */
+  @Test
+  void testFetchLatestInstallerOffline(WireMockRuntimeInfo wmRuntimeInfo) {
+
+    // arrange
+    IdeTestContext context = newContext(PROJECT_BASIC, wmRuntimeInfo);
+    context.setSystemInfo(SystemInfoMock.WINDOWS_X64);
+    context.getNetworkStatus().simulateNetworkError();
+    Git git = gitWithLatestInstallerBaseUrl(context, wmRuntimeInfo);
+
+    // act + assert
+    assertThatThrownBy(git::fetchLatestInstaller).isInstanceOf(CliOfflineException.class);
+  }
+
+  /**
+   * Verifies the real {@link ToolRepository} of a fresh Windows machine: it resolves the latest version, requests the file with the latest installer only once
+   * and rejects any other version, since only the latest installer is known.
+   *
+   * @param wmRuntimeInfo wireMock server on a random port.
+   */
+  @Test
+  void testLatestInstallerRepository(WireMockRuntimeInfo wmRuntimeInfo) {
+
+    // arrange
+    stubUrlFile(URL_FILE_X64, INSTALLER_X64);
+    IdeTestContext context = contextWithNetwork(wmRuntimeInfo, SystemInfoMock.WINDOWS_X64);
+    context.getFileAccess().delete(context.getUrlsPath());
+    Git git = gitWithLatestInstallerBaseUrl(context, wmRuntimeInfo);
+
+    // act
+    VersionIdentifier version = git.getToolRepository().resolveVersion("git", "git", VersionIdentifier.LATEST, git);
+
+    // assert
+    assertThat(version).isEqualTo(VersionIdentifier.of("2.56.0.4"));
+    assertThat(git.getToolRepository().findSecurity("git", "git")).isSameAs(ToolSecurity.getEmpty());
+    VersionIdentifier otherVersion = VersionIdentifier.of("2.40.0");
+    assertThatThrownBy(() -> git.getToolRepository().resolveVersion("git", "git", otherVersion, git)).isInstanceOf(IllegalStateException.class);
+    verify(1, getRequestedFor(urlEqualTo(URL_FILE_X64)));
+  }
+
+  private static Git gitWithLatestInstallerRepository(IdeTestContext context, ToolRepository latestInstallerRepository) {
+
+    return new Git(context) {
+      @Override
+      protected ToolRepository createLatestInstallerRepository() {
+        return latestInstallerRepository;
+      }
+    };
+  }
+
+  private static Git gitWithLatestInstallerBaseUrl(IdeTestContext context, WireMockRuntimeInfo wmRuntimeInfo) {
+
+    return new Git(context) {
+      @Override
+      protected String getLatestInstallerBaseUrl() {
+        return wmRuntimeInfo.getHttpBaseUrl() + "/";
+      }
+    };
+  }
+
+  private static IdeTestContext contextWithNetwork(WireMockRuntimeInfo wmRuntimeInfo, SystemInfo systemInfo) {
+
+    IdeTestContext context = newContext(PROJECT_BASIC, wmRuntimeInfo);
+    context.setSystemInfo(systemInfo);
+    context.getNetworkStatus().simulateOnline();
+    return context;
+  }
+
+  private static void stubUrlFile(String path, String body) {
+
+    stubFor(get(urlEqualTo(path)).willReturn(aResponse().withStatus(200).withBody(body)));
   }
 }

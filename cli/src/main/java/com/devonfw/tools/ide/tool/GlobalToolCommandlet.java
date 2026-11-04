@@ -172,6 +172,7 @@ public abstract class GlobalToolCommandlet extends AbstractToolCommandlet {
     FileAccess fileAccess = this.context.getFileAccess();
     Path target = toolRepository.download(this.tool, edition, resolvedVersion, this);
     ProcessContext pc;
+    boolean installedAsynchronously = true;
     boolean macDmg = isMacDmg(target);
     if (macDmg) {
       installMacDmg(target);
@@ -187,15 +188,22 @@ public abstract class GlobalToolCommandlet extends AbstractToolCommandlet {
         fileAccess.extract(target, downloadBinaryPath);
         executable = fileAccess.findFirst(downloadBinaryPath, Files::isExecutable, false);
       }
-      pc = this.context.newProcess().errorHandling(ProcessErrorHandling.LOG_WARNING).executable(executable);
-      int exitCode = runInstaller(pc);
+      pc = this.context.newProcess().errorHandling(ProcessErrorHandling.LOG_WARNING).executable(executable).addArgs(getInstallerArguments());
+      ProcessMode installerProcessMode = getInstallerProcessMode();
+      int exitCode = pc.run(installerProcessMode).getExitCode();
       if (tmpDir != null) {
         fileAccess.delete(tmpDir);
       }
       if (exitCode != 0) {
         throw new CliException("Installation process for " + this.tool + " in version " + resolvedVersion + " failed with exit code " + exitCode + "!");
       }
-      IdeLogLevel.SUCCESS.log(LOG, "Installation process for {} in version {} has started", this.tool, resolvedVersion);
+      installedAsynchronously = installerProcessMode.isBackground();
+      if (installedAsynchronously) {
+        IdeLogLevel.SUCCESS.log(LOG, "Installation process for {} in version {} has started", this.tool, resolvedVersion);
+      } else {
+        IdeLogLevel.SUCCESS.log(LOG, "Successfully installed {} in version {}", this.tool, resolvedVersion);
+        IdeLogLevel.INTERACTION.log(LOG, "Please open a new terminal so that {} is available there.", this.tool);
+      }
     }
     Step step = request.getStep();
     if (step != null) {
@@ -203,7 +211,7 @@ public abstract class GlobalToolCommandlet extends AbstractToolCommandlet {
     }
     installationPath = getInstallationPath(toolEdition.edition(), resolvedVersion);
     if (installationPath == null) {
-      return new ToolInstallation(null, null, null, resolvedVersion, true, true);
+      return new ToolInstallation(null, null, null, resolvedVersion, true, installedAsynchronously);
     }
     return createToolInstallation(installationPath, resolvedVersion, true, pc, false);
   }
@@ -543,14 +551,20 @@ public abstract class GlobalToolCommandlet extends AbstractToolCommandlet {
   }
 
   /**
-   * Runs the downloaded installer. By default it is started in the background without any arguments. Override this for tools whose installer needs specific
-   * arguments or has to be run differently.
-   *
-   * @param pc the {@link ProcessContext} with the installer as executable.
-   * @return the exit code of the installer.
+   * @return the additional arguments passed to the downloaded installer executable (e.g. silent mode flags). The default is an empty {@link List}. Override
+   *     this for tools whose installer requires specific arguments to run unattended.
    */
-  protected int runInstaller(ProcessContext pc) {
+  protected List<String> getInstallerArguments() {
 
-    return pc.run(ProcessMode.BACKGROUND_SILENT).getExitCode();
+    return List.of();
+  }
+
+  /**
+   * @return the {@link ProcessMode} to run the downloaded installer executable. The default is {@link ProcessMode#BACKGROUND_SILENT}. Override this for tools
+   *     whose installer has to be awaited.
+   */
+  protected ProcessMode getInstallerProcessMode() {
+
+    return ProcessMode.BACKGROUND_SILENT;
   }
 }

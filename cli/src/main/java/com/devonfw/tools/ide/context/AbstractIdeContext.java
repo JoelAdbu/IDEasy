@@ -1802,7 +1802,7 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
       }
     }
     if (bashPath == null) {
-      LOG.error("No bash executable could be found on your system.");
+      LOG.debug("No bash executable could be found on your system.");
     } else {
       this.bash = bashPath;
     }
@@ -1855,7 +1855,7 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
       Path bashPath = getPath().findBinary(plainBash, pathsToIgnore);
       bash = bashPath.toAbsolutePath();
       if (bashPath.equals(plainBash)) {
-        LOG.warn("No usable bash executable was found in your PATH environment variable!");
+        LOG.debug("No usable bash executable was found in your PATH environment variable!");
         bash = null;
       } else {
         if (Files.exists(bashPath)) {
@@ -1901,7 +1901,7 @@ public abstract class AbstractIdeContext implements IdeContext, IdeLogArgFormatt
             return null;
           }
         } else {
-          LOG.info("No bash executable could be found in the Windows registry.");
+          LOG.debug("No bash executable could be found in the Windows registry.");
         }
       }
     }
